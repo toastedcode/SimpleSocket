@@ -2,11 +2,11 @@ package com.toast.socket;
 
 public interface SocketListener
 {
-   void onConnected();
+   void onConnected(SimpleSocket socket);
    
-   void onDisconnected();
+   void onDisconnected(SimpleSocket socket);
    
-   void onConnectionFailed();
+   void onConnectionFailed(SimpleSocket socket);
    
-   void handleData(String buffer);
+   void handleData(SimpleSocket socket, String buffer);
 }

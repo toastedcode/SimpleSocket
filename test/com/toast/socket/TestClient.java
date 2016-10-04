@@ -1,12 +1,16 @@
 package com.toast.socket;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Scanner;
 
 public class TestClient implements SocketListener
 {
    public static void main(final String args[])
    {
-      System.out.format("*** Client ***\n\n");
+      System.out.format("*** Crispy Sock ***\n");
+      System.out.format("***    Client   ***\n\n");
       
       TestClient client = new  TestClient();
       
@@ -14,19 +18,41 @@ public class TestClient implements SocketListener
       socket.addListener(client);
       socket.connect("10.1.11.150", 1025);
       
-      Scanner scan = new Scanner(System.in);
-      String input = "";
+      System.out.print("Connecting ...");
+      while (!socket.isConnected())
+      {
+         try
+         {
+            Thread.sleep(1000);
+         }
+         catch(InterruptedException e)
+         {
+            
+         }
+         
+         System.out.print(".");
+      }
+      
+      String buffer = "";
+      BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
       
       while (!input.equals("quit"))
       {
-         System.out.format("Enter text: ");
-                  input = scan.next();
+         System.out.format("> ");
          
-         socket.write(input);
+         try
+         {
+            buffer = input.readLine();
+         }
+         catch (IOException e)
+         {
+            
+         }
+         
+         socket.write(buffer);
       }
       
       socket.disconnect();
-      scan.close();
    }
    
    TestClient()
@@ -35,27 +61,29 @@ public class TestClient implements SocketListener
    }
 
    @Override
-   public void onConnected()
+   public void onConnected(SimpleSocket socket)
    {
-      System.out.format("Client connected!");
+      System.out.format(" connected to %s!\n\n", socket.getSocket().getRemoteSocketAddress().toString());
    }
 
    @Override
-   public void onDisconnected()
+   public void onDisconnected(SimpleSocket socket)
    {
       System.out.format("Client dissconnected!");
       
    }
 
    @Override
-   public void onConnectionFailed()
+   public void onConnectionFailed(SimpleSocket socket)
    {
       System.out.format("Client connection failed!");
    }
 
    @Override
-   public void handleData(String buffer)
+   public void handleData(SimpleSocket socket, String buffer)
    {
-      System.out.println(buffer);
+      System.out.print(buffer);
    }
+   
+   private static BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
 }

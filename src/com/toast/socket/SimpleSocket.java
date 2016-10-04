@@ -1,8 +1,9 @@
 package com.toast.socket;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.net.ServerSocket;
@@ -15,7 +16,7 @@ public class SimpleSocket
    //                             Public
    // **************************************************************************
    
-   SimpleSocket()
+   public SimpleSocket()
    {
    }
    
@@ -47,47 +48,42 @@ public class SimpleSocket
          @Override
          public void run()
          {
-            while ((clientSocket == null) || (clientSocket.isConnected() == false))
+            while (true)
             {
-               try
+               while ((clientSocket == null) || (clientSocket.isConnected() == false))
                {
-                  clientSocket = new Socket(address, port);
-               }
-               catch (IOException e)
-               {
-                  e.printStackTrace();
-               }
+                  try
+                  {
+                     clientSocket = new Socket(address, port);
+                  }
+                  catch (IOException e)
+                  {
+                     // Ignore and keep trying ...
+                  }
+                  
+                  try
+                  {
+                     Thread.sleep(250);
+                  } 
+                  catch (InterruptedException e)
+                  {
+                     e.printStackTrace();
+                  }
+                  
+               }  // end while (clientSocket.isConnected() == false)
                
-               try
-               {
-                  Thread.sleep(250);
-               } 
-               catch (InterruptedException e)
-               {
-                  e.printStackTrace();
-               }
+               isConnected = true;
                
-            }  // end while (clientSocket.isConnected() == false)
-            
-            
-            isConnected = true;
-            
-            onConnected();
-            
-            //
-            // Now start listening for input.
-            //
-            
-            while (isConnected)
-            {
-               try
+               onConnected();
+               
+               // Start listening for input.
+               while (isConnected)
                {
-                  String buffer = input.readLine();
-                  handleData(buffer);
-               }
-               catch (IOException e)
-               {
-                  disconnect();
+                  read();
+                  
+                  //
+                  // Blocks until EOL encountered.
+                  //
                }
             }
 
@@ -115,31 +111,28 @@ public class SimpleSocket
          {
             try
             {
-               serverSocket = new ServerSocket(port);
-               clientSocket = serverSocket.accept();
-               
-               //
-               // Blocks until connection is made.
-               //
-               
-               isConnected = true;
-               
-               onConnected();
-               
-               //
-               // Now start listening for input.
-               //
-               
-               while (isConnected)
+               while (true)
                {
-                  try
+                  // Attempt to connect.
+                  serverSocket = new ServerSocket(port);
+                  clientSocket = serverSocket.accept();
+                  
+                  //
+                  // Blocks until connection is made.
+                  //
+                  
+                  isConnected = true;
+                  
+                  onConnected();
+                  
+                  // Start listening for input.
+                  while (isConnected)
                   {
-                     String buffer = input.readLine();
-                     handleData(buffer);
-                  }
-                  catch (IOException e)
-                  {
-                     disconnect();
+                     read();
+                     
+                     //
+                     // Blocks until EOL encountered.
+                     //
                   }
                }
             }
@@ -151,8 +144,9 @@ public class SimpleSocket
                
                onConnectionFailed();
             }
-         }
-      };
+            
+         }  // end public void run()
+      };  // end thread
       
       // Go!
       socketThread.start();  
@@ -171,7 +165,9 @@ public class SimpleSocket
             
             clientSocket.close();
             
-            socketThread.stop();  // TODO: Research.
+            //socketThread.stop();  // TODO: Research.
+            
+            isConnected = false;
             
             onDisconnected();
          }
@@ -187,19 +183,18 @@ public class SimpleSocket
       return (isConnected);
    }
    
+   public Socket getSocket()
+   {
+      return (clientSocket);
+   }
+   
    public void write(String buffer)
    {
       if (output != null)
       {
-         try
-         {
-            output.writeChars(buffer);
-            output.writeChar('\n');
-         }
-         catch (IOException e)
-         {
-            e.printStackTrace();
-         }
+         output.write(buffer);
+         output.write(EOL_CHARACTER);
+         output.flush();
       }
    }
    
@@ -209,20 +204,11 @@ public class SimpleSocket
    
    private void onConnected()
    {
-      System.out.format("Connected to %s\n",  clientSocket.getInetAddress());
-      
       try
       {
-         input = new DataInputStream(clientSocket.getInputStream());
-      }
-      catch (IOException e)
-      {
-         e.printStackTrace();
-      }
-      
-      try
-      {
-         output = new DataOutputStream(clientSocket.getOutputStream());
+         output = new PrintWriter(clientSocket.getOutputStream(), true);
+         
+         input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
       }
       catch (IOException e)
       {
@@ -231,7 +217,7 @@ public class SimpleSocket
       
       for (SocketListener listener : listeners)
       {
-         listener.onConnected();         
+         listener.onConnected(this);         
       }
    }
    
@@ -239,7 +225,7 @@ public class SimpleSocket
    {
       for (SocketListener listener : listeners)
       {
-         listener.onConnectionFailed();         
+         listener.onConnectionFailed(this);         
       }
    }
    
@@ -247,7 +233,24 @@ public class SimpleSocket
    {
       for (SocketListener listener : listeners)
       {
-         listener.onDisconnected();         
+         listener.onDisconnected(this);         
+      }
+   }
+   
+   private void read()
+   {
+      try
+      {
+         String buffer = input.readLine();
+         
+         if (!buffer.isEmpty())
+         {
+            handleData(buffer);
+         }
+      }
+      catch (Exception e)
+      {
+         disconnect();
       }
    }
    
@@ -255,9 +258,11 @@ public class SimpleSocket
    {
       for (SocketListener listener : listeners)
       {
-         listener.handleData(buffer);         
+         listener.handleData(this, buffer);         
       }
    }
+   
+   private static final char EOL_CHARACTER = '\n';
    
    private Thread socketThread;
    
@@ -269,9 +274,9 @@ public class SimpleSocket
    
    private boolean isConnected = false;
    
-   DataInputStream input;
+   PrintWriter output;
    
-   DataOutputStream output;
+   BufferedReader input;
    
    List<SocketListener> listeners = new ArrayList<>(); 
 }
