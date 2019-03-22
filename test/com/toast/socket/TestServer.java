@@ -12,13 +12,13 @@ public class TestServer implements SocketListener
       System.out.format("***    Server   ***\n\n");
 
       
-      TestServer server = new  TestServer();
+      TestServer server = new TestServer();
       
       SimpleSocket socket = new SimpleSocket();
       socket.addListener(server);
       socket.listen(1025);
       
-      System.out.print("Connecting ...");
+      System.out.print("Listening on port 1025 ...");
       while (!socket.isConnected())
       {
          try
@@ -29,8 +29,6 @@ public class TestServer implements SocketListener
          {
             
          }
-         
-         System.out.print(".");
       }
       
       String buffer = "";
